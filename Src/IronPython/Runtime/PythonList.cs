@@ -162,7 +162,7 @@ namespace IronPython.Runtime {
             }
         }
 
-        internal PythonList(ICollection items)
+        public PythonList([NotNone] ICollection items)
             : this(items.Count) {
 
             int i = 0;
@@ -476,7 +476,7 @@ namespace IronPython.Runtime {
                     if (this == value) value = new PythonList((ICollection)value);
 
                     if (ValueRequiresNoLocks(value)) {
-                        // we don't need to worry about lock ordering of accesses to the 
+                        // we don't need to worry about lock ordering of accesses to the
                         // RHS & ourselves.  We can lock once and avoid repeatedly locking/unlocking
                         // on each assign.
                         lock (this) {
@@ -505,7 +505,7 @@ namespace IronPython.Runtime {
             // We don't lock other here - instead we read it's object array
             // and size therefore having a stable view even if it resizes.
             // This means if we had a multithreaded app like:
-            // 
+            //
             //  T1                   T2                     T3
             //  l1[:] = [1] * 100    l1[:] = [2] * 100      l3[:] = l1[:]
             //
@@ -522,7 +522,7 @@ namespace IronPython.Runtime {
                         _data[i + start] = otherData[i];
                     }
                 } else {
-                    // we are resizing the array (either bigger or smaller), we 
+                    // we are resizing the array (either bigger or smaller), we
                     // will copy the data array and replace it all at once.
                     stop = Math.Max(stop, start);
                     int newSize = _size - (stop - start) + otherSize;
@@ -559,7 +559,7 @@ namespace IronPython.Runtime {
                         _data[i + start] = other[i];
                     }
                 } else {
-                    // we are resizing the array (either bigger or smaller), we 
+                    // we are resizing the array (either bigger or smaller), we
                     // will copy the data array and replace it all at once.
                     stop = Math.Max(stop, start);
                     int newSize = _size - (stop - start) + other.Count;
@@ -696,6 +696,26 @@ namespace IronPython.Runtime {
             }
         }
 
+        public void parallel_for_each(PythonFunction? f) {
+            lock (this) {
+                if (f != null) {
+
+                    if (f.__code__.co_argcount != 2) {
+                        throw new AttributeErrorException("For Each Function needs 2 Arguments (Index & Element)");
+                    }
+
+                    for (int i = 0; i < _data.Length; i++) {
+                        int sep = i;
+                        var val = _data[i];
+                        System.Threading.Tasks.Task.Run(() => { f.__call__(f.Context, sep, val); });
+                    }
+
+                }
+            }
+        }
+
+
+
         /// <summary>
         /// Non-thread safe adder, should only be used by internal callers that
         /// haven't yet exposed their list.
@@ -803,7 +823,7 @@ namespace IronPython.Runtime {
             => index(item, start, _size);
 
         public int index(object? item, int start, int stop) {
-            // CPython behavior for index is to only look at the 
+            // CPython behavior for index is to only look at the
             // original items.  If new items are added they
             // are ignored, but if items are removed they
             // aren't iterated.  We therefore get a stable view
@@ -996,7 +1016,7 @@ namespace IronPython.Runtime {
 
             // new pass
             for (; ; ) {
-                // p & q  traverse the lists during each pass.  
+                // p & q  traverse the lists during each pass.
                 //  s is usually the most most recently processed record of the current sublist
                 //  t points to the end of the previously output sublist
                 int s = 0;
@@ -1006,7 +1026,7 @@ namespace IronPython.Runtime {
 
                 if (q == 0) break;  // we're done
                 for (; ; ) {
-                    // Indexes into the array here are 1 based.  0 is a 
+                    // Indexes into the array here are 1 based.  0 is a
                     // virtual element and so is (len - 1) - they only exist in
                     // the length array.
 
@@ -1131,7 +1151,7 @@ namespace IronPython.Runtime {
             get {
                 // no locks works here, we either return an
                 // old item (as if we were called first) or return
-                // a current item...        
+                // a current item...
 
                 // force reading the array first, _size can change after
                 object?[] data = GetData();
@@ -1529,7 +1549,7 @@ namespace IronPython.Runtime {
 
     /// <summary>
     /// we need to lock both objects (or copy all of one's data w/ it's lock held, and
-    /// then compare, which is bad).  Therefore we have a strong order for locking on 
+    /// then compare, which is bad).  Therefore we have a strong order for locking on
     /// the two objects based upon the hash code or object identity in case of a collision
     /// </summary>
     public struct OrderedLocker : IDisposable {

@@ -269,7 +269,7 @@ namespace IronPython.Runtime {
                 try {
                     HookAssemblyResolve();
                 } catch (System.Security.SecurityException) {
-                    // We may not have SecurityPermissionFlag.ControlAppDomain. 
+                    // We may not have SecurityPermissionFlag.ControlAppDomain.
                     // If so, we will not look up sys.path for module loads
                 }
             }
@@ -795,6 +795,8 @@ namespace IronPython.Runtime {
             return ast;
         }
 
+
+        // MARK: Compilation Point
         internal static ScriptCode CompilePythonCode(SourceUnit/*!*/ sourceUnit, CompilerOptions/*!*/ options, ErrorSink/*!*/ errorSink) {
             var pythonOptions = (PythonCompilerOptions)options;
 
@@ -1250,7 +1252,7 @@ namespace IronPython.Runtime {
             try {
                 AppDomain.CurrentDomain.AssemblyResolve -= _resolveHolder.AssemblyResolveEvent;
             } catch (System.Security.SecurityException) {
-                // We may not have SecurityPermissionFlag.ControlAppDomain. 
+                // We may not have SecurityPermissionFlag.ControlAppDomain.
                 // If so, we will not look up sys.path for module loads
             }
         }
@@ -1592,7 +1594,7 @@ namespace IronPython.Runtime {
 
         /// <summary>
         /// Returns (and creates if necessary) the PythonService that is associated with this PythonContext.
-        /// 
+        ///
         /// The PythonService is used for providing remoted convenience helpers for the DLR hosting APIs.
         /// </summary>
         internal Hosting.PythonService GetPythonService(Microsoft.Scripting.Hosting.ScriptEngine engine) {
@@ -1701,7 +1703,7 @@ namespace IronPython.Runtime {
 
                 if (Environment.OSVersion.Platform == PlatformID.Unix) {
                     // we make our nt package show up as a posix package
-                    // on unix platforms.  Because we build on top of the 
+                    // on unix platforms.  Because we build on top of the
                     // CLI for all file operations we should be good from
                     // there, but modules that check for the presence of
                     // names (e.g. os) will do the right thing.
@@ -2531,8 +2533,8 @@ namespace IronPython.Runtime {
 
         /// <summary>
         /// Invokes the specified operation on the provided arguments and returns the new resulting value.
-        /// 
-        /// operation is usually a value from StandardOperators (standard CLR/DLR operator) or 
+        ///
+        /// operation is usually a value from StandardOperators (standard CLR/DLR operator) or
         /// OperatorStrings (a Python specific operator)
         /// </summary>
         internal object Operation(PythonOperationKind operation, object self, object other) {
@@ -2989,13 +2991,13 @@ namespace IronPython.Runtime {
         /// <summary>
         /// Sets the current command dispatcher for the Python command line.  The previous dispatcher
         /// is returned.  Null can be passed to remove the current command dispatcher.
-        /// 
+        ///
         /// The command dispatcher will be called with a delegate to be executed.  The command dispatcher
         /// should invoke the target delegate in the desired context.
-        /// 
+        ///
         /// A common use for this is to enable running all REPL commands on the UI thread while the REPL
         /// continues to run on a non-UI thread.
-        /// 
+        ///
         /// The ipy.exe REPL will call into PythonContext.DispatchCommand to dispatch each execution to
         /// the correct thread.  Other REPLs can do the same to support this functionality as well.
         /// </summary>
@@ -3096,8 +3098,8 @@ namespace IronPython.Runtime {
         /// <summary>
         /// Gets a function which can be used for comparing two values using the normal
         /// Python semantics.
-        /// 
-        /// If type is null then a generic comparison function is returned.  If type is 
+        ///
+        /// If type is null then a generic comparison function is returned.  If type is
         /// not null a comparison function is returned that's used for just that type.
         /// </summary>
         internal IComparer GetComparer(Type type) {

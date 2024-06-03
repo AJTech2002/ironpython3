@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 
 using Microsoft.Scripting.Runtime;
 
@@ -36,7 +37,8 @@ namespace IronPython.Runtime {
         public Enumerate(CodeContext context, object iter, object start) {
             object index = PythonOps.Index(start);
             _iter = PythonOps.GetEnumerator(context, iter);
-            _index = context.LanguageContext.Operation(Binding.PythonOperationKind.Subtract, index, ScriptingRuntimeHelpers.Int32ToObject(1));
+            _index = context.LanguageContext.Operation(Binding.PythonOperationKind.Subtract, index,
+                ScriptingRuntimeHelpers.Int32ToObject(1));
         }
 
         public object __iter__() {
@@ -70,15 +72,11 @@ namespace IronPython.Runtime {
         }
 
         object IEnumerator.Current {
-            get {
-                return PythonTuple.MakeTuple(_index, _iter.Current);
-            }
+            get { return PythonTuple.MakeTuple(_index, _iter.Current); }
         }
 
         object IEnumerator<object>.Current {
-            get {
-                return ((IEnumerator)this).Current;
-            }
+            get { return ((IEnumerator)this).Current; }
         }
 
         bool IEnumerator.MoveNext() {
@@ -103,16 +101,118 @@ namespace IronPython.Runtime {
         #endregion
     }
 
+    [PythonType("parallel")]
+    [Documentation("parallel(iterable) -> iterator for index, value of iterable run in parallel")]
+    [DontMapIDisposableToContextManager, DontMapIEnumerableToContains]
+    public class Parallel : IEnumerator, IEnumerator<object> {
+        private readonly IEnumerator _iter;
+        private object _index;
+        private readonly List<Task> _tasks;
+        private readonly CodeContext _context;
+
+        public Parallel(CodeContext context, object iter) {
+            _iter = PythonOps.GetEnumerator(context, iter);
+            _index = ScriptingRuntimeHelpers.Int32ToObject(-1);
+            _tasks = new List<Task>();
+            _context = context;
+        }
+
+        public Parallel(CodeContext context, object iter, object start) {
+            object index = PythonOps.Index(start);
+            _iter = PythonOps.GetEnumerator(context, iter);
+            _index = context.LanguageContext.Operation(Binding.PythonOperationKind.Subtract, index,
+                ScriptingRuntimeHelpers.Int32ToObject(1));
+            _tasks = new List<Task>();
+            _context = context;
+        }
+
+        public object __iter__() {
+            return this;
+        }
+
+        public PythonTuple __reduce__() {
+            return PythonTuple.MakeTuple(
+                DynamicHelpers.GetPythonType(this),
+                PythonTuple.MakeTuple(_iter, AddOneTo(_index))
+            );
+        }
+
+        private static object AddOneTo(object _index) {
+            if (_index is int index) {
+                if (index != int.MaxValue) {
+                    return ScriptingRuntimeHelpers.Int32ToObject(index + 1);
+                } else {
+                    return new BigInteger(int.MaxValue) + 1;
+                }
+            } else {
+                Debug.Assert(_index is BigInteger);
+                return (BigInteger)_index + 1;
+            }
+        }
+
+        #region IEnumerator Members
+
+        void IEnumerator.Reset() {
+            throw new NotImplementedException();
+        }
+
+        object IEnumerator.Current {
+            get { return PythonTuple.MakeTuple(_index, _iter.Current); }
+        }
+
+        object IEnumerator<object>.Current {
+            get { return ((IEnumerator)this).Current; }
+        }
+
+        bool IEnumerator.MoveNext() {
+            _index = AddOneTo(_index);
+            if (_iter.MoveNext()) {
+                var current = _iter.Current;
+                var index = _index;
+                Task task = Task.Run(() => {
+                    // Your parallel task logic here. For example:
+                    Console.WriteLine($"Processing index {index}, value {current}");
+                });
+                _tasks.Add(task);
+                return true;
+            }
+
+            return false;
+        }
+
+        #endregion
+
+        #region IDisposable Members
+
+        void IDisposable.Dispose() {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        [PythonHidden]
+        protected virtual void Dispose(bool notFinalizing) {
+            if (notFinalizing) {
+                // Wait for all tasks to complete before disposing
+                Task.WaitAll(_tasks.ToArray());
+            }
+        }
+
+        #endregion
+    }
+
     [PythonType("callable_iterator")]
     public sealed class SentinelIterator : IEnumerator, IEnumerator<object> {
         private readonly object _target;
         private readonly object _sentinel;
-        private readonly CodeContext/*!*/ _context;
+
+        private readonly CodeContext /*!*/
+            _context;
+
         private readonly CallSite<Func<CallSite, CodeContext, object, object>> _site;
         private object _current;
         private bool _sinkState;
 
-        public SentinelIterator(CodeContext/*!*/ context, object target, object sentinel) {
+        public SentinelIterator(CodeContext /*!*/ context, object target, object sentinel) {
             _target = target;
             _sentinel = sentinel;
             _context = context;
@@ -134,15 +234,11 @@ namespace IronPython.Runtime {
         #region IEnumerator implementation
 
         object IEnumerator.Current {
-            get {
-                return _current;
-            }
+            get { return _current; }
         }
 
         object IEnumerator<object>.Current {
-            get {
-                return _current;
-            }
+            get { return _current; }
         }
 
         bool IEnumerator.MoveNext() {
@@ -179,6 +275,7 @@ namespace IronPython.Runtime {
         private readonly CodeContext _context;
         private readonly object _baseObject;
         private object _current;
+
         public static bool TryCastIEnumer(object baseObject, out IEnumerator enumerator) {
             if (baseObject is IEnumerator et) {
                 enumerator = et;
@@ -205,6 +302,7 @@ namespace IronPython.Runtime {
                 if (TryCastIEnumer(iterator, out enumerator)) {
                     return true;
                 }
+
                 enumerator = new PythonEnumerator(context, iterator);
                 return true;
             } else {
@@ -218,6 +316,7 @@ namespace IronPython.Runtime {
             if (!TryCreate(context, baseObject, out res)) {
                 throw PythonOps.TypeError("cannot convert {0} to IEnumerator", PythonOps.GetPythonTypeName(baseObject));
             }
+
             return res;
         }
 
@@ -236,9 +335,7 @@ namespace IronPython.Runtime {
         }
 
         public object Current {
-            get {
-                return _current;
-            }
+            get { return _current; }
         }
 
         /// <summary>
@@ -262,6 +359,7 @@ namespace IronPython.Runtime {
 
                     throw lightEh;
                 }
+
                 return true;
             } catch (StopIterationException) {
                 return false;
@@ -281,7 +379,8 @@ namespace IronPython.Runtime {
         private readonly object _iterator;
 
         public static bool TryCreate(CodeContext context, object baseEnumerator, out IEnumerable enumerator) {
-            Debug.Assert(!(baseEnumerator is IEnumerable) || baseEnumerator is IPythonObject);   // we shouldn't re-wrap things that don't need it
+            Debug.Assert(!(baseEnumerator is IEnumerable) ||
+                         baseEnumerator is IPythonObject); // we shouldn't re-wrap things that don't need it
 
             if (PythonOps.TryGetBoundAttr(context, baseEnumerator, "__iter__", out object iter)) {
                 object iterator = PythonCalls.Call(context, iter);
@@ -292,8 +391,10 @@ namespace IronPython.Runtime {
                         enumerator = null;
                         return false;
                     }
+
                     enumerator = new PythonEnumerable(context, iterator);
                 }
+
                 return true;
             } else {
                 enumerator = null;
@@ -306,6 +407,7 @@ namespace IronPython.Runtime {
             if (!TryCreate(context, baseObject, out res)) {
                 throw PythonOps.TypeError("cannot convert {0} to IEnumerable", PythonOps.GetPythonTypeName(baseObject));
             }
+
             return res;
         }
 
@@ -326,6 +428,7 @@ namespace IronPython.Runtime {
     [PythonType("iterator")]
     public sealed class ItemEnumerator : IEnumerator {
         private readonly CodeContext _context;
+
         // The actual object on which we are calling __getitem__()
         private object _source;
         private object _getItemMethod;
@@ -333,7 +436,8 @@ namespace IronPython.Runtime {
         private object _current;
         private int _index;
 
-        internal ItemEnumerator(CodeContext context, object source, object getItemMethod, CallSite<Func<CallSite, CodeContext, object, int, object>> site) {
+        internal ItemEnumerator(CodeContext context, object source, object getItemMethod,
+            CallSite<Func<CallSite, CodeContext, object, int, object>> site) {
             _context = context;
             _source = source;
             _getItemMethod = getItemMethod;
@@ -347,6 +451,7 @@ namespace IronPython.Runtime {
             if (_index < 0) {
                 return PythonTuple.MakeTuple(iter, PythonTuple.MakeTuple(PythonTuple.EMPTY));
             }
+
             return PythonTuple.MakeTuple(iter, PythonTuple.MakeTuple(_source), _index);
         }
 
@@ -369,9 +474,7 @@ namespace IronPython.Runtime {
         #region IEnumerator members
 
         object IEnumerator.Current {
-            get {
-                return _current;
-            }
+            get { return _current; }
         }
 
         bool IEnumerator.MoveNext() {
@@ -388,14 +491,14 @@ namespace IronPython.Runtime {
                 _site = null;
                 _source = null;
                 _getItemMethod = null;
-                _index = -1;     // this is the end
+                _index = -1; // this is the end
                 return false;
             } catch (StopIterationException) {
                 _current = null;
                 _site = null;
                 _source = null;
                 _getItemMethod = null;
-                _index = -1;     // this is the end
+                _index = -1; // this is the end
                 return false;
             }
         }
@@ -415,7 +518,8 @@ namespace IronPython.Runtime {
         private readonly object _getitem;
         private readonly CallSite<Func<CallSite, CodeContext, object, int, object>> _site;
 
-        internal ItemEnumerable(CodeContext context, object source, object getitem, CallSite<Func<CallSite, CodeContext, object, int, object>> site) {
+        internal ItemEnumerable(CodeContext context, object source, object getitem,
+            CallSite<Func<CallSite, CodeContext, object, int, object>> site) {
             _context = context;
             _source = source;
             _getitem = getitem;

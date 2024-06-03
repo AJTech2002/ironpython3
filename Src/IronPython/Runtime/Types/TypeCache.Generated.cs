@@ -35,6 +35,7 @@ namespace IronPython.Runtime.Types {
         private static PythonType pythonmodule;
         private static PythonType method;
         private static PythonType enumerate;
+        private static PythonType parallel;
         private static PythonType intType;
         private static PythonType singleType;
         private static PythonType doubleType;
@@ -172,6 +173,14 @@ namespace IronPython.Runtime.Types {
                 return enumerate;
             }
         }
+
+        public static PythonType Parallel {
+            get {
+                if (parallel == null) parallel = DynamicHelpers.GetPythonTypeFromType(typeof(Parallel));
+                return parallel;
+            }
+        }
+
 
         public static PythonType Int32 {
             get {

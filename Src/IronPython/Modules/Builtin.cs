@@ -268,6 +268,8 @@ Noteworthy: None is the `nil' object; Ellipsis represents `...' in slices.";
         }
 
         public static PythonType enumerate => TypeCache.Enumerate;
+        public static PythonType parallel => TypeCache.Parallel;
+
 
         internal static PythonDictionary? GetAttrLocals(CodeContext/*!*/ context, object? locals) {
             PythonDictionary? attrLocals = null;

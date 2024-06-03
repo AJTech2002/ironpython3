@@ -15,6 +15,7 @@ using System.Numerics;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading.Tasks;
 
 using Microsoft.Scripting.Runtime;
 using Microsoft.Scripting.Utils;
@@ -123,6 +124,7 @@ namespace IronPython.Modules {
                 _typeCode = type[0];
                 _data = CreateData(_typeCode);
             }
+
 
             public array([NotNone] string type, [NotNone] Bytes initializer) : this(type) {
                 frombytes(initializer);
@@ -237,8 +239,11 @@ namespace IronPython.Modules {
             }
 
             public void append(object? iterable) {
+
                 _data.Add(iterable);
             }
+
+
 
             internal IntPtr GetArrayAddress() {
                 return _data.GetAddress();
@@ -741,7 +746,7 @@ namespace IronPython.Modules {
                 }
             }
 
-            // a version of FromStream that overwrites up to 'nbytes' bytes, starting at 'index' 
+            // a version of FromStream that overwrites up to 'nbytes' bytes, starting at 'index'
             // Returns the number of bytes written.
             internal long FromStream(Stream ms, int index, int nbytes) {
                 BinaryReader br = new BinaryReader(ms);
@@ -771,7 +776,7 @@ namespace IronPython.Modules {
                 }
 
                 if (len % itemsize > 0) {
-                    // we have some extra bytes that we need to do a partial read on.                  
+                    // we have some extra bytes that we need to do a partial read on.
                     byte[] curBytes = ToBytes(len / itemsize + index);
                     for (int i = 0; i < len % itemsize; i++) {
                         curBytes[i] = br.ReadByte();
@@ -1044,6 +1049,12 @@ namespace IronPython.Modules {
             IPythonBuffer IBufferProtocol.GetBuffer(BufferFlags flags) {
                 return _data.GetBuffer(this, _typeCode.ToString(), flags);
             }
+
+            #endregion
+
+            #region Custom Types
+
+
 
             #endregion
         }
